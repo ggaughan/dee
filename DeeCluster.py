@@ -2,7 +2,7 @@
 __version__ = "0.1"
 __author__ = "Greg Gaughan"
 __copyright__ = "Copyright (C) 2007 Greg Gaughan"
-__license__ = "GPL" #see Licence.txt for licence information
+__license__ = "MIT" #see Licence.txt for licence information
 
 from Dee import Relation, Tuple
 from DeeDatabase import Database
