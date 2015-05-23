@@ -1,0 +1,1348 @@
+Dee
+===
+..  todo:
+    intro:
+        see Rel.html...
+
+    relation -> relvar
+
+    quickstart guide that goes straight to DeeWebDemo
+
+    add link to _`The Third Manifesto`: http://www.thethirdmanifesto.com
+    
+    TTM -> Databases, Types and the Relational Model
+
+    add .. sidebar:: Sidebar Title
+   	    :subtitle: Optional Sidebar Subtitle
+
+    add image(s)!
+    
+    give user-def ops example of TCLOSE (compare Python to Java!)
+    
+    add GNU?
+
+:Author: Greg Gaughan
+:Contact: greg at quicksort dot co dot uk
+:Copyright: Copyright (C) 2007 Greg Gaughan
+
+Contents
+--------
+.. contents::
+
+Mind the gap
+------------
+.. sidebar::
+    "Yet by obscuring the true data source these solutions end up throwing away the most compelling feature of relational databases; the ability for the data to be queried."
+
+    -- Microsoft, DLinq .NET Language-Integrated Query for Relational Data, May 2006
+    
+Most of today's programs handle data in one way or another and often this data is stored in some kind of relational database. To read and modify this data, a program must bridge the gap between its representation and the one used by the dialect of SQL that their database provides. This bridge typically comprises a database API that sends queries as text strings, often accompanied by some kind of table-to-object mapper that has to coerce data and relationships in both directions, often with many layers of abstraction in an effort to keep the two sides loosely coupled.
+
+This approach not only adds complexity and increases the need for data transformations but, most importantly, it typically destroys the significant advantages provided by the relational model of data. The relational model is built upon predicate logic which brings the power of formal reasoning to data. It is the only sound foundation available.
+
+    "It was Codd's very great insight that a database could be thought of as a set of relations, that a relation in turn could be thought of as a set of propositions (assumed by convention to be true), and hence that all of the apparatus of formal logic could be directly applied to the problem of database access and related problems."
+
+    -- C. J. Date, `The Database Relational Model`_, Addison-Wesley, April 2000
+
+Enough of the shenanigans!
+--------------------------
+    "It is no wonder that applications expected to bridge this gap are difficult to build and maintain. It would certainly simplify the equation to get rid of one side or the other. Yet relational databases provide critical infrastructure for long-term storage and query processing, and modern programming languages are indispensable for agile development and rich computation."
+
+    -- Microsoft, DLinq .NET Language-Integrated Query for Relational Data, May 2006
+
+The solution to the problem is not to get rid of one side or the other but to merge the two sides: supersede SQL (the COBOL of database languages) with a true relational programming language, one that is computationally complete, and then the gap disappears. Our solution uses one of the most effective, expressive and readable languages available, Python_, and extends it with relations and a sound relational algebra that far exceeds the power of SQL.
+
+History
+-------
+todo
+Network, ad-hoc, Codd, PC, oo, xml, orm, dlinq...
+
+Where We're Coming From
+-----------------------
+Having implemented a comprehensive, standard-compliant SQL server, `ThinkSQL <http://www.thinksql.co.uk>`_, we did some further research into the history of SQL's dominance in the market and its quirky syntax. We found a far superior alternative in the form of "Date and Darwen's Dream Database" based on a fully relational language, one which had yet to be implemented.
+
+The relational algebra and most of the ideas underlying Dee come from Date and Darwen's `The Third Manifesto`_. The current version is an initial release to gain feedback regarding the approach. We chose Python because its interpreted style, dynamic typing and built in sets and dictionaries make it ideal for interacting with data; plus any language that allows you to do the following sorts of things has got to be good:
+
+    >>> x, y = 45, 90
+    >>> print x, y
+    45 90
+    >>> x, y = y, x         #swapping values without the usual temporary variable!
+    >>> print x, y
+    90 45
+
+    >>> 70 < x < 120
+    True
+
+See `Why Use Python? <http://www.python.org/doc/essays/ppt/acm-ws/sld011.htm>`_ for more information.
+
+Where We're Going
+-----------------
+The current release is an initial proposal, intended to encourage feedback. We have many ideas for future versions to make it more deployable. See the `Future Work`_ section below for more details.
+
+Basics
+------
+To start using Dee from within the Python interpreter or from a Python program, first import the module. (For demonstrating we import everything but it's recommended that you only import the features you need.)
+
+    >>> from Dee import *
+
+Tuples
+~~~~~~
+A Tuple is a set of attribute, value pairs. A Tuple can be represented by a Python_ dictionary, e.g.
+
+	>>> print {"StudentId":'S1', "Name":'Anne'}
+	{'StudentId': 'S1', 'Name': 'Anne'}
+
+and the attributes and values can be extracted using the standard Python_ syntax, e.g.
+
+	>>> t1 = {"StudentId":'S1', "Name":'Anne'}
+	>>> t1["StudentId"]
+	'S1'
+
+	>>> "Name" in t1
+	True
+
+	>>> t1.keys()
+	['StudentId', 'Name']
+
+A more powerful way is to use the Tuple class which allows a slightly simpler syntax for creating and referring to attribute values. To create a Tuple:
+
+	>>> t1 = Tuple(StudentId='S1', Name='Anne')
+
+and then the attributes values can be extracted in the same way as the Python_ dictionary but also using the dot notation without the quotes, e.g.
+
+	>>> t1["Name"]
+	'Anne'
+
+	>>> t1.Name
+	'Anne'
+
+The Tuple class also provides a number of useful methods, such as project and remove, for manipulating relational tuples.
+
+Attribute values are dynamically typed in the usual Python way and they should be of the same type for every tuple in a given relation.
+
+Relations
+~~~~~~~~~
+A Relation comprises a heading and a body. The heading is a set of attribute names. The body provides a set of tuples either literally (for a base relation) or via a relational expression (for a virtual relation). Each tuple has a value for every attribute in the heading. To create a base Relation pass the heading as a list of attributes followed by the body as a list of tuples, e.g.:
+
+        >>> print Relation(["StudentId", "Name"],
+        ...               [{"StudentId":'S1', "Name":'Anne'},
+        ...                {"StudentId":'S2', "Name":'Boris'},
+        ...                {"StudentId":'S3', "Name":'Cindy'},
+        ...                {"StudentId":'S4', "Name":'Devinder'},
+        ...                {"StudentId":'S5', "Name":'Boris'},
+        ...               ])
+    	+-----------+----------+
+    	| StudentId | Name     |
+    	+===========+==========+
+    	| S1        | Anne     |
+    	| S2        | Boris    |
+    	| S3        | Cindy    |
+    	| S4        | Devinder |
+    	| S5        | Boris    |
+    	+-----------+----------+
+
+Note: there is no order to the heading attributes (they are a set) nor is there any order to the tuples in the body (they are a set). There is no duplication in the heading attributes (they are a set) nor is there any duplication in the tuples in the body (they are a set).
+
+To assign a relation value to a relation variable, use the standard Python_ syntax, e.g.
+
+        >>> IS_CALLED = Relation(["StudentId", "Name"],
+        ...                     [{"StudentId":'S1', "Name":'Anne'},
+        ...                      {"StudentId":'S2', "Name":'Boris'},
+        ...                      {"StudentId":'S3', "Name":'Cindy'},
+        ...                      {"StudentId":'S4', "Name":'Devinder'},
+        ...                      {"StudentId":'S5', "Name":'Boris'},
+        ...                     ])
+
+An alternative way to define a relation is to use the Tuple class to define the body:
+
+        >>> IS_CALLED = Relation(["StudentId", "Name"],
+        ...                     [Tuple(StudentId='S1', Name='Anne'),
+        ...                      Tuple(StudentId='S2', Name='Boris'),
+        ...                      Tuple(StudentId='S3', Name='Cindy'),
+        ...                      Tuple(StudentId='S4', Name='Devinder'),
+        ...                      Tuple(StudentId='S5', Name='Boris'),
+        ...                     ])
+
+or alteratively, a less verbose option is available which relies on the order of the body attributes matching the order of the heading:
+
+        >>> IS_CALLED = Relation(["StudentId", "Name"],
+        ...                     [('S1', 'Anne'),
+        ...                      ('S2', 'Boris'),
+        ...                      ('S3', 'Cindy'),
+        ...                      ('S4', 'Devinder'),
+        ...                      ('S5', 'Boris'),
+        ...                     ])
+
+(Note that Python_ allows an additional comma after the last item in a list, which can simplify copy/paste operations. Also a tuple with a single value must have a comma after the value to distinguish it from a value in parentheses, e.g. (7,) rather than (7))
+
+There are a number of ways to display the value of a relation:
+
+1. Print its value as a string (i.e. using its __str__ method), e.g.
+
+	>>> print IS_CALLED
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S1        | Anne     |
+	| S2        | Boris    |
+	| S3        | Cindy    |
+	| S4        | Devinder |
+	| S5        | Boris    |
+	+-----------+----------+
+
+2. Print its representation (i.e. using its __repr__ method), e.g.
+
+	>>> print `IS_CALLED`		#or just: >>> IS_CALLED
+	Relation(('StudentId', 'Name'),
+	[Tuple(StudentId='S1', Name='Anne'), Tuple(StudentId='S2', Name='Boris'), Tuple(StudentId='S3', Name='Cindy'), Tuple(StudentId='S4', Name='Devinder'), Tuple(StudentId='S5', Name='Boris')],
+	{'PK':(Key, None)})
+
+   Note: this representation can itself be evaluated using Python_'s eval() function to retrieve the relation's value, e.g.
+
+	>>> print eval(`IS_CALLED`)
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S1        | Anne     |
+	| S2        | Boris    |
+	| S3        | Cindy    |
+	| S4        | Devinder |
+	| S5        | Boris    |
+	+-----------+----------+
+   	>>> r2=eval(`IS_CALLED`)
+	>>> print r2
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S1        | Anne     |
+	| S2        | Boris    |
+	| S3        | Cindy    |
+	| S4        | Devinder |
+	| S5        | Boris    |
+	+-----------+----------+
+
+3. Print it rendered as an HTML table, e.g.
+
+	>>> print IS_CALLED.renderHTML()
+	<table><thead><th><em>Studentid</em></th><th><em>Name</em></th></thead><tbody><tr><td>S1</td><td>Anne</td></tr><tr><td>S2</td><td>Boris</td></tr><tr><td>S3</td><td>Cindy</td></tr><tr><td>S4</td><td>Devinder</td></tr><tr><td>S5</td><td>Boris</td></tr></tbody></table>
+
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S1        | Anne     |
+	+-----------+----------+
+	| S2        | Boris    |
+	+-----------+----------+
+	| S3        | Cindy    |
+	+-----------+----------+
+	| S4        | Devinder |
+	+-----------+----------+
+	| S5        | Boris    |
+	+-----------+----------+
+
+The heading of a relation can be retrieved via its heading method, which returns the attributes as a Python set, e.g.
+
+	>>> print IS_CALLED.heading()
+	set(['StudentId', 'Name'])
+
+Virtual Relations
+~~~~~~~~~~~~~~~~~
+To create a virtual (or derived) Relation we first need to define a function to provide the data by returning a relation body or set of tuples. For example (ignore the relational expression syntax for now, we'll cover the details of that later):
+
+	>>> def vIS_CALLED_caps():
+	... 	return IS_CALLED.extend(['NameCaps'], lambda t: {'NameCaps': t.Name.upper()}).remove(['Name'])
+
+Then pass the heading as a list of attributes followed by the body as a function reference, e.g.:
+
+	>>> print Relation(["StudentId", "NameCaps"], vIS_CALLED_caps)
+	+-----------+----------+
+	| StudentId | NameCaps |
+	+===========+==========+
+	| S1        | ANNE     |
+	| S2        | BORIS    |
+	| S3        | CINDY    |
+	| S4        | DEVINDER |
+	| S5        | BORIS    |
+	+-----------+----------+
+
+Such virtual relations can be assigned to relation variables and their values will then vary as the underlying base relations vary, e.g.
+
+	>>> IS_CALLED_caps = Relation(["StudentId", "NameCaps"], vIS_CALLED_caps)
+	>>> print IS_CALLED_caps
+	+-----------+----------+
+	| StudentId | NameCaps |
+	+===========+==========+
+	| S1        | ANNE     |
+	| S2        | BORIS    |
+	| S3        | CINDY    |
+	| S4        | DEVINDER |
+	| S5        | BORIS    |
+	+-----------+----------+
+
+These virtual relation variables are called views in SQL.
+
+Relation Value Attributes
+~~~~~~~~~~~~~~~~~~~~~~~~~
+An attribute of a relation can itself be a relation. Such attributes are known as relation value attributes or RVAs. There are a number of relational operators (actually macros) that use such nested relations. For example, GROUP, which takes a relation and a set of attribute names together with a group name and returns a relation with the set of attributes as a nested relation, 1 per unique value of the non-grouped attributes:
+
+	>>> print GROUP(IS_CALLED, ['StudentId'], 'StudentIds')
+	+----------+---------------+
+	| Name     | StudentIds    |
+	+==========+===============+
+	| Anne     | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S1        | |
+	|          | +-----------+ |
+	| Boris    | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S2        | |
+	|          | | S5        | |
+	|          | +-----------+ |
+	| Cindy    | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S3        | |
+	|          | +-----------+ |
+	| Devinder | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S4        | |
+	|          | +-----------+ |
+	+----------+---------------+
+
+Predefined Relations
+~~~~~~~~~~~~~~~~~~~~
+There are two special relations (actually relation constants) that are rarely used directly but are important in defining the logic behind the relational algebra. We introduce them here.
+
+DUM
+***
+This is the relation that has no attributes and no tuples. It plays the role of False. It is difficult to display.
+	>>> print DUM
+	+
+	+
+
+	>>> print DUM.renderHTML()
+	<table><thead></thead><tbody></tbody></table>
+
+It is also called TABLE_DUM and FALSE.
+
+DEE
+***
+This is the relation that has no attributes and a single tuple. It plays the role of True. It is difficult to display.
+	>>> print DEE
+	+
+	+
+	+
+
+	>>> print DEE.renderHTML()
+	<table><thead></thead><tbody><tr></tr></tbody></table>
+
+It is also called TABLE_DEE and TRUE.
+
+Relation Constraints
+~~~~~~~~~~~~~~~~~~~~
+A Relation (base or virtual) can also take an extra parameter in its constructor to specify a set of constraints. This takes the form of a Python_ dictionary where each key gives the constraint name and each value is a pair of constraint-function, parameters. For example, to specify that the "StudentId" attribute is a candidate key for the above relation we could say:
+
+        >>> IS_CALLED = Relation(['StudentId', 'Name'],
+        ...                     [('S1', 'Anne'),
+        ...                      ('S2', 'Boris'),
+        ...                      ('S3', 'Cindy'),
+        ...                      ('S4', 'Devinder'),
+        ...                      ('S5', 'Boris'),
+        ...                     ],
+        ...                     {'PK':(Key, ['StudentId'])}
+        ...                    )
+        >>> print IS_CALLED
+    	+-----------+----------+
+    	| StudentId | Name     |
+    	+===========+----------+
+    	| S1        | Anne     |
+    	| S2        | Boris    |
+    	| S3        | Cindy    |
+    	| S4        | Devinder |
+    	| S5        | Boris    |
+    	+-----------+----------+
+
+Here, Key is a pre-defined constraint type (actually a function wrapper that creates a function) that takes a list of attributes to enforce the constraint. A constraint function can return True or False and is called whenever the relation is assigned a new value. If no candidate key is specified for a relation, one is assumed comprising all the attributes in the relation (this is displayed in representations as {'PK':(Key, None)}). As another example:
+
+        >>> COURSE = Relation(['CourseId', 'Title'],
+        ...                  [('C1', 'Database'),
+        ...                   ('C2', 'HCI'),
+        ...                   ('C3', 'Op Systems'),
+        ...                   ('C4', 'Programming'),
+        ...                  ],
+        ...                  {'PK':(Key, ['CourseId'])}
+        ...                 )
+
+Another pre-defined constraint (function wrapper) is ForeignKey. It takes a relation name and a mapping of foreign key attributes to candidate key attributes as parameters, e.g.:
+
+        >>> IS_ENROLLED_ON = Relation(['StudentId', 'CourseId'],
+        ...                         [('S1', 'C1'),
+        ...                          ('S1', 'C2'),
+        ...                          ('S2', 'C1'),
+        ...                          ('S3', 'C3'),
+        ...                          ('S4', 'C1'),
+        ...                         ],
+        ...                         {'FKS':(ForeignKey, ('IS_CALLED', {'StudentId':'StudentId'})),
+        ...                          'FKC':(ForeignKey, ('COURSE', {'CourseId':'CourseId'}))}
+        ...                        )
+
+Here, two foreign keys are declared to ensure referential integrity between this relation and the IS_CALLED and COURSE relations.
+
+Lambda
+------
+In a number of places we need to pass expressions, e.g. restrictions (where clauses). Python_ has a built-in way of defining such expressions with anonymous functions using the lambda keyword. So an example restriction for the above IS_CALLED relation could be:
+
+	>>> print IS_CALLED.where(lambda t: t.Name == 'Boris')
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S5        | Boris |
+	+-----------+-------+
+
+In this example, the lambda expression is passed to the relation's where function and the expression introduces a range variable, t, which will stand for each Tuple in the relation. The expression itself, the part after the colon, tests whether the Name attribute of each tuple is equal to 'Boris': if it is then the tuple is included in the result. Any Python_ expression can be passed this way. So here, complex boolean expressions including boolean operators and function calls can be built, e.g.
+
+	>>> print IS_CALLED.where(lambda t: t.Name.startswith('B') and t.StudentId.endswith('5'))
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S5        | Boris |
+	+-----------+-------+
+
+	>>> print IS_CALLED.where(lambda t: 'A' < t.Name[0] < 'D')
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S3        | Cindy |
+	| S5        | Boris |
+	+-----------+-------+
+
+	>>> print IS_CALLED.where(lambda t: t["Name"].startswith('B'))
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S5        | Boris |
+	+-----------+-------+
+
+It's perhaps worth noting that the where function is really just shorthand for a natural join. Take the first example:
+
+	>>> print IS_CALLED.where(lambda t: t.Name == 'Boris')
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S5        | Boris |
+	+-----------+-------+
+
+This relational calculus based where clause can be rephrased using the relational algebra's AND operator (in this case acting as the natural join):
+
+	>>> print IS_CALLED & Relation(['Name'], [('Boris',)])
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S5        | Boris |
+	+-----------+-------+
+
+Many of the relational methods provided are in fact macros implemented using only a few fundamental relational operators, such as AND.
+
+Another place lambda expressions can be used is when defining virtual relations. For example the earlier example:
+
+	>>> def vIS_CALLED_caps():
+	... 	return IS_CALLED.extend(['NameCaps'], lambda t: {'NameCaps': t.Name.upper()}).remove(['Name'])
+	>>> print Relation(["StudentId", "NameCaps"], vIS_CALLED_caps)
+	+-----------+----------+
+	| StudentId | NameCaps |
+	+===========+==========+
+	| S1        | ANNE     |
+	| S2        | BORIS    |
+	| S3        | CINDY    |
+	| S4        | DEVINDER |
+	| S5        | BORIS    |
+	+-----------+----------+
+
+Could be re-coded using lambda in a more concise way as:
+
+	>>> print Relation(["StudentId", "NameCaps"],
+	...             	lambda: IS_CALLED.extend(['NameCaps'], lambda t: {
+	...						  'NameCaps': t.Name.upper()}).remove(['Name']))
+	+-----------+----------+
+	| StudentId | NameCaps |
+	+===========+==========+
+	| S1        | ANNE     |
+	| S2        | BORIS    |
+	| S3        | CINDY    |
+	| S4        | DEVINDER |
+	| S5        | BORIS    |
+	+-----------+----------+
+
+Lambda expressions can also be used as general constraints. On relations, another pre-defined constraint is Constraint. This takes a lambda expression that must evaluate to True for the constraint to hold, e.g.:
+
+        >>> EXAM_MARK = Relation(['StudentId', 'CourseId', 'Mark'],
+        ...                     [('S1', 'C1', 85),
+        ...                      ('S1', 'C2', 49),
+        ...                      ('S2', 'C1', 49),
+        ...                      ('S3', 'C3', 66),
+        ...                      ('S4', 'C1', 93),
+        ...                     ],
+        ...                     {'PK':(Key, ['StudentId', 'CourseId']),
+        ...			 'MarkRange': (Constraint, lambda r: ALL(r, lambda t: 0 <= t.Mark <= 100))}
+        ...                    )
+
+Here, the 'MarkRange' Constraint uses the ALL relational operator (discussed below) to ensure that all Marks in this relation are between 0 and 100. Note the Constraint works at the relation level and its range variable is r in the example. Useful operators at this level are IS_EMPTY, ALL, ANY, and the relational comparison operators discussed below, because they all take relations and return a boolean result.
+
+Relations to Tuples
+-------------------
+Here are some conversion functions to map between relations and tuples:
+
+fromTuple
+~~~~~~~~~
+This static method creates a relation from a tuple:
+
+	>>> r1 = Relation.fromTuple({'CourseId':'C1', 'Title':'Database'})
+	>>> print r1
+	+----------+----------+
+	| CourseId | Title    |
+	+==========+==========+
+	| C1       | Database |
+	+----------+----------+
+
+It can also take an extra parameter to specify a set of constraints:
+
+	>>> r1 = Relation.fromTuple({'CourseId':'C1', 'Title':'Database'}, {'PK':(Key, ['CourseId'])})
+	>>> print r1
+	+----------+----------+
+	| CourseId | Title    |
+	+==========+----------+
+	| C1       | Database |
+	+----------+----------+
+
+toTuple
+~~~~~~~
+This can apply only to a single-tuple relation and creates a tuple from that relation:
+
+	>>> t1 = r1.toTuple()
+	>>> print t1
+	Tuple(CourseId='C1', Title='Database')
+	>>> print t1.Title
+	Database
+
+fromTupleList
+~~~~~~~~~~~~~
+This static method creates a relation from a list of tuples:
+
+	>>> r2 = Relation.fromTupleList([{'CourseId':'C1', 'Title':'Database'},
+	...			         {'CourseId':'C4', 'Title':'Programming'},
+	...			         {'CourseId':'C3', 'Title':'Op Systems'},
+	...			         {'CourseId':'C2', 'Title':'HCI'}])
+	>>> print r2
+	+----------+-------------+
+	| CourseId | Title       |
+	+==========+=============+
+	| C1       | Database    |
+	| C4       | Programming |
+	| C3       | Op Systems  |
+	| C2       | HCI         |
+	+----------+-------------+
+
+It can also take an extra parameter to specify a set of constraints:
+
+	>>> r2 = Relation.fromTupleList([{'CourseId':'C1', 'Title':'Database'},
+	...			         {'CourseId':'C4', 'Title':'Programming'},
+	...			         {'CourseId':'C3', 'Title':'Op Systems'},
+	...			         {'CourseId':'C2', 'Title':'HCI'}],
+	...				{'PK':(Key, ['CourseId'])})
+	>>> print r2
+	+----------+-------------+
+	| CourseId | Title       |
+	+==========+-------------+
+	| C1       | Database    |
+	| C4       | Programming |
+	| C3       | Op Systems  |
+	| C2       | HCI         |
+	+----------+-------------+
+
+toTupleList
+~~~~~~~~~~~
+This creates a list of tuples from the relation. Since relations are sets they can have no order, so to iterate through all the tuples in a relation you must use this method to first create a list of tuples from the relation.
+
+	>>> ts = r2.toTupleList()
+	>>> print ts
+	[Tuple(CourseId='C1', Title='Database'), Tuple(CourseId='C4', Title='Programming'), Tuple(CourseId='C3', Title='Op Systems'), Tuple(CourseId='C2', Title='HCI')]
+
+This list can then be iterated over in the usual ways, e.g:
+
+	>>> for t in ts:
+	...	print t.Title
+	Database
+	Programming
+	Op Systems
+	HCI
+
+	>>> print [t.Title for t in ts if t.CourseId=='C4']
+	['Programming']
+
+	>>> for t in reversed(ts):
+	...	print t.Title
+	HCI
+	Op Systems
+	Programming
+	Database
+
+	>>> print len(ts)
+	4
+
+	>>> print ts[0]
+	Tuple(CourseId='C1', Title='Database')
+
+	>>> print ts[-1]
+	Tuple(CourseId='C2', Title='HCI')
+
+
+This is also the way to access the tuples in a pre-defined order. The toTupleList method can take an extra parameter to define a sort order. The sort parameter is pair (ascending, attribute-list) where ascending is a boolean flag to indicate whether to sort in ascending order or not, and the attribute-list specifies the attributes to sort on.
+
+	>>> tss = r2.toTupleList((True, ['Title']))
+	>>> print [t.Title for t in tss]
+	['Database', 'HCI', 'Op Systems', 'Programming']
+
+	>>> tss = r2.toTupleList((False, ['CourseId']))
+	>>> print [t.CourseId for t in tss]
+	['C4', 'C3', 'C2', 'C1']
+
+The renderToHTML method, mentioned earlier, is built upon the toTupleList method and also allows this sort parameter, e.g:
+
+	>>> print r2.renderHTML(sort=(True, ['Title']))
+	<table><thead><th><em>Courseid</em></th><th>Title</th></thead><tbody><tr><td>C1</td><td>Database</td></tr><tr><td>C2</td><td>HCI</td></tr><tr><td>C3</td><td>Op Systems</td></tr><tr><td>C4</td><td>Programming</td></tr></tbody></table>
+
+	+----------+-------------+
+	| CourseId | Title       |
+	+==========+=============+
+	| C1       | Database    |
+	+----------+-------------+
+	| C2       | HCI         |
+	+----------+-------------+
+	| C3       | Op Systems  |
+	+----------+-------------+
+	| C4       | Programming |
+	+----------+-------------+
+
+
+Relational Comparisons
+----------------------
+A number of boolean operators are available to compare the values of two relations. These are all implemented with the obvious overloaded Python comparisons.
+
+Equality (==)
+~~~~~~~~~~~~~
+	>>> print IS_CALLED == Relation(['StudentId', 'Name'],
+        ...                     [('S1', 'Anne'),
+        ...                      ('S2', 'Boris'),
+        ...                      ('S3', 'Cindy'),
+        ...                      ('S4', 'Devinder'),
+        ...                      ('S5', 'Boris'),
+        ...                     ])
+        True
+
+A useful shorthand for testing equality against an empty relation is to use the IS_EMPTY function:
+	>>> print IS_EMPTY(IS_CALLED.where(lambda t: t.StudentId=='S99'))
+	True
+
+	>>> print not IS_EMPTY(IS_CALLED)
+	True
+
+Inequality (!=, not ... ==)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	>>> print IS_CALLED != COURSE
+        True
+
+	>>> print not IS_CALLED == COURSE
+        True
+
+Proper Subset (<)
+~~~~~~~~~~~~~~~~~
+	>>> print IS_CALLED.where(lambda t: t.StudentId=='S3') < IS_CALLED
+        True
+	>>> print IS_CALLED.where(lambda t: t.StudentId.startswith('S')) < IS_CALLED
+        False
+
+Subset (<=)
+~~~~~~~~~~~
+	>>> print IS_CALLED.where(lambda t: t.StudentId=='S3') <= IS_CALLED
+        True
+	>>> print IS_CALLED.where(lambda t: t.StudentId.startswith('S')) <= IS_CALLED
+        True
+        >>> print IS_CALLED.where(lambda t: t.StudentId=='S3') <= IS_CALLED.where(lambda t: t.StudentId.startswith('S')) <= IS_CALLED
+        True
+
+Proper Superset (>)
+~~~~~~~~~~~~~~~~~~~
+	>>> print IS_CALLED > IS_CALLED.where(lambda t: t.StudentId=='S3')
+        True
+	>>> print IS_CALLED > IS_CALLED.where(lambda t: t.StudentId.startswith('S'))
+        False
+
+Superset (>=)
+~~~~~~~~~~~~~
+	>>> print IS_CALLED >= IS_CALLED.where(lambda t: t.StudentId=='S3')
+        True
+	>>> print IS_CALLED >= IS_CALLED.where(lambda t: t.StudentId.startswith('S'))
+        True
+
+Membership (in)
+~~~~~~~~~~~~~~~
+This is effectively the same as the subset comparison:
+	>>> print IS_CALLED.where(lambda t: t.StudentId=='S3') in IS_CALLED
+	True
+
+The membership operator can also be passed a tuple:
+	>>> print Tuple(StudentId='S3', Name='Cindy') in IS_CALLED
+	True
+
+	>>> print Tuple(StudentId='S3', Name='Bob') in IS_CALLED
+	False
+
+	>>> print Tuple(StudentId='S3', Name='Cindy') not in IS_CALLED
+	False
+
+	>>> print Tuple(StudentId='S3', Name='Bob') not in IS_CALLED
+	True
+
+
+Relational Operators
+--------------------
+We use a small core of relational operators to deliver a large number of operations. For example, we use & (relational AND) to provide natural join, intersection and Cartesian product, and we use it as the basis for implementing restriction and extension. A number of other operators are defined as macros on top of the core ones, e.g. GROUP, and this number can easily be increased. The ideas behind this approach can be found in `The Third Manifesto`_ chapter 5.
+
+One of the powerful uses of & is the natural join. This joins relations together on their commonly named attributes. To make the most of this, without having to rename attributes before each join, use the same name for the same attributes across relations, e.g. if a key on one relation is named "product_code" then use that same name in all other relations in case they need to be joined. Naming it "code" on the product relation and "product_code" on other relations would require the rename operator to be used before doing a natural join (not to mention making the two attributes appear to be different things).
+
+The relational operators are defined as Python_ functions taking, and usually returning, relations. Many of the common ones are also defined as methods and operators on the Relation class.
+
+Some basic operations on a relation now presented.
+
+Projection (project, remove)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is so called because a relation can be thought of as representing a point in n-dimensional space (where n is the number of attributes) and just selecting a few of them is akin to projecting that point onto the chosen axes.
+Note once again that since a relation body is a set of tuples, there are no duplicate tuples.
+
+	>>> print IS_CALLED.project(['Name'])
+	+----------+
+	| Name     |
+	+==========+
+	| Anne     |
+	| Boris    |
+	| Cindy    |
+	| Devinder |
+	+----------+
+
+	>>> print IS_CALLED(['Name'])
+	+----------+
+	| Name     |
+	+==========+
+	| Anne     |
+	| Boris    |
+	| Cindy    |
+	| Devinder |
+	+----------+
+
+	>>> print IS_CALLED.remove(['Name'])
+	+-----------+
+	| StudentId |
+	+===========+
+	| S1        |
+	| S2        |
+	| S3        |
+	| S4        |
+	| S5        |
+	+-----------+
+
+Rename (rename)
+~~~~~~~~~~~~~~~
+This is crucial to our implementation since attributes with the same name are considered to represent the same thing. The mapping of old to new attribute name(s) is given as a Python_ dictionary (or indeed a Tuple would also do).
+
+	>>> print IS_CALLED.rename({'Name':'NewName'})
+	+-----------+----------+
+	| StudentId | NewName  |
+	+===========+----------+
+	| S1        | Anne     |
+	| S2        | Boris    |
+	| S3        | Cindy    |
+	| S4        | Devinder |
+	| S5        | Boris    |
+	+-----------+----------+
+
+	>>> print IS_CALLED.rename({'StudentId':'NewId', 'Name':'NewName'})
+	+-------+----------+
+	| NewId | NewName  |
+	+=======+----------+
+	| S1    | Anne     |
+	| S2    | Boris    |
+	| S3    | Cindy    |
+	| S4    | Devinder |
+	| S5    | Boris    |
+	+-------+----------+
+
+Restriction (where)
+~~~~~~~~~~~~~~~~~~~
+This is also known as relational selection, but that can be confusing because of the SELECT in SQL which is actually for projection.
+
+	>>> print IS_CALLED.where(lambda t: t.StudentId=='S4')
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S4        | Devinder |
+	+-----------+----------+
+
+Natural Join, Times, Intersection (&)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If you think about it, these are all the same thing - it just depends on whether the relations have some, none, or all of their attributes in common. We implement them all using the AND relational operator using the Python_ &.
+Note that since a relation heading is a set of attributes, there are no duplicate attributes.
+
+Natural Join - Some attributes in common
+****************************************
+
+	>>> print IS_CALLED & IS_ENROLLED_ON
+	+----------+-----------+----------+
+	| CourseId | StudentId | Name     |
+	+==========+===========+==========+
+	| C1       | S1        | Anne     |
+	| C2       | S1        | Anne     |
+	| C1       | S2        | Boris    |
+	| C3       | S3        | Cindy    |
+	| C1       | S4        | Devinder |
+	+----------+-----------+----------+
+
+Times (Cartesian Join) - No attributes in common
+************************************************
+Beware: this kind of join can be very large and is almost always meaningless.
+
+	>>> print IS_CALLED & COURSE
+	+----------+-----------+----------+-------------+
+	| CourseId | StudentId | Name     | Title       |
+	+==========+===========+==========+=============+
+	| C1       | S1        | Anne     | Database    |
+	| C1       | S2        | Boris    | Database    |
+	| C1       | S3        | Cindy    | Database    |
+	| C1       | S4        | Devinder | Database    |
+	| C1       | S5        | Boris    | Database    |
+	| C2       | S1        | Anne     | HCI         |
+	| C2       | S2        | Boris    | HCI         |
+	| C2       | S3        | Cindy    | HCI         |
+	| C2       | S4        | Devinder | HCI         |
+	| C2       | S5        | Boris    | HCI         |
+	| C3       | S1        | Anne     | Op Systems  |
+	| C3       | S2        | Boris    | Op Systems  |
+	| C3       | S3        | Cindy    | Op Systems  |
+	| C3       | S4        | Devinder | Op Systems  |
+	| C3       | S5        | Boris    | Op Systems  |
+	| C4       | S1        | Anne     | Programming |
+	| C4       | S2        | Boris    | Programming |
+	| C4       | S3        | Cindy    | Programming |
+	| C4       | S4        | Devinder | Programming |
+	| C4       | S5        | Boris    | Programming |
+	+----------+-----------+----------+-------------+
+
+Intersection - All attributes in common
+***************************************
+
+	>>> print IS_CALLED.where(lambda t: t.Name[0] < 'C') & IS_CALLED.where(lambda t:t.Name[0] > 'A')
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S5        | Boris |
+	+-----------+-------+
+
+Note that this is equivalent to:
+
+	>>> print IS_CALLED.where(lambda t: t.Name[0] < 'C' and t.Name[0] > 'A')
+	+-----------+-------+
+	| StudentId | Name  |
+	+===========+=======+
+	| S2        | Boris |
+	| S5        | Boris |
+	+-----------+-------+
+
+Or, Union (\|)
+~~~~~~~~~~~~~~
+These are the same thing - it just depends on whether the relations have any of their attributes in common. We implement them all using the OR relational operator using the Python_ \|.
+For pragmatic reasons, we only implement the Union operator, i.e. where the relations have all of their attributes in common. The more general Or would need to handle an infinite (impossible) number of alternatives.
+
+	>>> print IS_CALLED.where(lambda t: t.Name[0] > 'C') | IS_CALLED.where(lambda t:t.Name[0] < 'B')
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S4        | Devinder |
+	| S1        | Anne     |
+	+-----------+----------+
+
+Note that this is equivalent to:
+
+	>>> print IS_CALLED.where(lambda t: t.Name[0] > 'C' or t.Name[0] < 'B')
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S1        | Anne     |
+	| S4        | Devinder |
+	+-----------+----------+
+
+Difference (-)
+~~~~~~~~~~~~~~
+Note that, unlike intersection and union, this is not commutative: which relation is mentioned first does make a difference (excuse the pun).
+
+	>>> print IS_CALLED - IS_CALLED.where(lambda t:t.Name[0] < 'B')
+	+-----------+----------+
+	| StudentId | Name     |
+	+===========+==========+
+	| S2        | Boris    |
+	| S3        | Cindy    |
+	| S4        | Devinder |
+	| S5        | Boris    |
+	+-----------+----------+
+
+Extension (extend)
+~~~~~~~~~~~~~~~~~~
+This is used to add new attributes to relations. First, the list of the names of the extra attributes is passed, followed by a lambda expression returning a dictionary containing the attribute values for each tuple.
+
+	>>> print IS_CALLED.extend(['Initial'], lambda t: {'Initial':t.Name[:1]})
+	+---------+-----------+----------+
+	| Initial | StudentId | Name     |
+	+=========+===========+==========+
+	| A       | S1        | Anne     |
+	| B       | S2        | Boris    |
+	| C       | S3        | Cindy    |
+	| D       | S4        | Devinder |
+	| B       | S5        | Boris    |
+	+---------+-----------+----------+
+
+Note that this does not modify the original relation.
+
+Some not-so-basic but very useful operators
+-------------------------------------------
+Generation (GENERATE)
+~~~~~~~~~~~~~~~~~~~~~
+This is a shorthand for converting a tuple into a relation and then joining it with TABLE_DEE to create a relation with the give tuple as its body.
+
+	>>> print GENERATE({'x':50, 'y':100})
+	+-----+----+
+	| y   | x  |
+	+=====+====+
+	| 100 | 50 |
+	+-----+----+
+
+	>>> print GENERATE(Tuple(x=50, y=100))
+	+-----+----+
+	| y   | x  |
+	+=====+====+
+	| 100 | 50 |
+	+-----+----+
+
+Summarization (SUMMARIZE)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	>>> print EXAM_MARK
+	+-----------+----------+------+
+	| StudentId | CourseId | Mark |
+	+===========+==========+------+
+	| S1        | C1       | 85   |
+	| S1        | C2       | 49   |
+	| S2        | C1       | 49   |
+	| S3        | C3       | 66   |
+	| S4        | C1       | 93   |
+	+-----------+----------+------+
+
+	>>> print SUMMARIZE(EXAM_MARK, EXAM_MARK(["CourseId"]), {'TopScore':(MAX, lambda t: t.Mark)})
+	+----------+----------+
+	| CourseId | TopScore |
+	+==========+==========+
+	| C1       | 93       |
+	| C2       | 49       |
+	| C3       | 66       |
+	+----------+----------+
+
+	>>> print SUMMARIZE(EXAM_MARK, COURSE(["CourseId"]), {'Takers':(COUNT, None)})
+	+----------+--------+
+	| CourseId | Takers |
+	+==========+========+
+	| C1       | 3      |
+	| C2       | 1      |
+	| C3       | 1      |
+	| C4       | 0      |
+	+----------+--------+
+
+Grouping and Ungrouping (GROUP, UNGROUP)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This converts relations into relations with relation value attributes (RVAs), and vice versa.
+
+	>>> A = GROUP(IS_CALLED, ['StudentId'], 'StudentIds')
+	>>> print A
+	+----------+---------------+
+	| Name     | StudentIds    |
+	+==========+===============+
+	| Anne     | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S1        | |
+	|          | +-----------+ |
+	| Boris    | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S2        | |
+	|          | | S5        | |
+	|          | +-----------+ |
+	| Cindy    | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S3        | |
+	|          | +-----------+ |
+	| Devinder | +-----------+ |
+	|          | | StudentId | |
+	|          | +===========+ |
+	|          | | S4        | |
+	|          | +-----------+ |
+	+----------+---------------+
+
+	>>> B = UNGROUP(A, 'StudentIds')
+	>>> print B
+    	+-----------+----------+
+    	| StudentId | Name     |
+    	+===========+==========+
+    	| S1        | Anne     |
+    	| S2        | Boris    |
+    	| S5        | Boris    |
+    	| S3        | Cindy    |
+    	| S4        | Devinder |
+    	+-----------+----------+
+
+Wrapping and Unwrapping (WRAP, UNWRAP)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	>>> A = WRAP(EXAM_MARK, ['CourseId', 'Mark'], 'CourseMark')
+	>>> print A
+	+-------------------------------+-----------+
+	| CourseMark                    | StudentId |
+	+===============================+===========+
+	| Tuple(CourseId='C1', Mark=85) | S1        |
+	| Tuple(CourseId='C2', Mark=49) | S1        |
+	| Tuple(CourseId='C1', Mark=49) | S2        |
+	| Tuple(CourseId='C3', Mark=66) | S3        |
+	| Tuple(CourseId='C1', Mark=93) | S4        |
+	+-------------------------------+-----------+
+
+	>>> print UNWRAP(A, 'CourseMark')
+	+----------+-----------+------+
+	| CourseId | StudentId | Mark |
+	+==========+===========+======+
+	| C1       | S1        | 85   |
+	| C2       | S1        | 49   |
+	| C1       | S2        | 49   |
+	| C3       | S3        | 66   |
+	| C1       | S4        | 93   |
+	+----------+-----------+------+
+
+Semijoin (SEMIJOIN, MATCHING)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        >>> print SEMIJOIN(IS_CALLED, IS_ENROLLED_ON)
+    	+-----------+----------+
+    	| StudentId | Name     |
+    	+===========+==========+
+    	| S1        | Anne     |
+    	| S2        | Boris    |
+    	| S3        | Cindy    |
+    	| S4        | Devinder |
+    	+-----------+----------+
+
+Semidifference (SEMIMINUS, NOT_MATCHING)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        >>> print SEMIMINUS(IS_CALLED, IS_ENROLLED_ON)
+    	+-----------+-------+
+    	| StudentId | Name  |
+    	+===========+=======+
+    	| S5        | Boris |
+    	+-----------+-------+
+
+Composition (COMPOSE)
+~~~~~~~~~~~~~~~~~~~~~
+This gives a handy shorthand for performing the natural join and then removing any attributes that were common to the relations.
+
+	>>> print COMPOSE(IS_ENROLLED_ON, COURSE)
+	+-----------+------------+
+	| StudentId | Title      |
+	+===========+============+
+	| S1        | Database   |
+	| S2        | Database   |
+	| S4        | Database   |
+	| S1        | HCI        |
+	| S3        | Op Systems |
+	+-----------+------------+
+
+This operator is especially attractive if we think of a relation as a function: 'calling' the function with another relation as a parameter can be achieved by performing a natural join. For example, suppose we have a virtual relation, plus, with a heading of ['x', 'y', 'z']. Suppose the tuples of this relation are all the possible ones where x + y = z. One implementation of such a virtual relation, a relation constant, could be:
+
+	>>> def plusfn(trx):
+	...     """Plus (could just as well be called minus)"""
+	...     if set(['x', 'y']).issubset(trx.attributes()) and not set(['z']).issubset(trx.attributes()):
+	...         return [Tuple(x=trx.x, y=trx.y, z=trx.x + trx.y)]
+	...     if set(['x', 'z']).issubset(trx.attributes()) and not set(['y']).issubset(trx.attributes()):
+	...         return [Tuple(x=trx.x, y=trx.z - trx.x, z=trx.z)]
+	...     if set(['y', 'z']).issubset(trx.attributes()) and not set(['x']).issubset(trx.attributes()):
+	...         return [Tuple(x=trx.z - trx.y, y=trx.y, z=trx.z)]
+	...
+	...     if set(['x', 'y', 'z']).issubset(trx.attributes()):
+	...         if trx.x + trx.y == trx.z:
+	...             return [Tuple()]    #DEE, i.e. True        #todo: should really return trx(x,y,z) - no matter?
+	...         else:
+	...             return []           #DUM, i.e. False
+	...
+	...     raise RelationException("Plus: Infinite rows") #no x,y or z
+	...	#Note: we could go further and return tuples given just one attribute
+	...	#      or indeed we could start yielding infinite combinations if no attributes are passed
+
+	>>> plus = Relation(['x', 'y', 'z'], plusfn)
+
+And it could be used to test whether an expression is valid or not: a returned tuple means True (DEE), no tuple means False (DUM).
+
+	>>> print GENERATE({'x':3, 'y':4, 'z':7}) & plus	#i.e. is 3 + 4 = 7?
+	+---+---+---+
+	| y | x | z |
+	+===+===+===+
+	| 4 | 3 | 7 |
+	+---+---+---+
+
+	>>> print GENERATE({'x':4, 'y':4, 'z':7}) & plus	#i.e. is 4 + 4 = 7?
+	+---+---+---+
+	| y | x | z |
+	+===+===+===+
+
+Also, it could be used to fill in the blank:
+
+	>>> print GENERATE({'x':3, 'y':4}) & plus		#i.e. what's 3 + 4?
+	+---+---+---+
+	| y | x | z |
+	+===+===+===+
+	| 4 | 3 | 7 |
+	+---+---+---+
+
+	>>> print GENERATE({'z':7, 'y':4}) & plus		#i.e. what's 7 - 4?
+	+---+---+---+
+	| y | x | z |
+	+===+===+===+
+	| 4 | 3 | 7 |
+	+---+---+---+
+
+The advantages of using a natural join in this way over standard functions is that it takes and returns a relation. So multiple questions can be asked at once:
+
+	>>> print Relation(['x', 'y'],
+	...		   [(3, 4),
+	...		    (7, 8),
+	...		    (11, 23)]) & plus		#i.e. what are 3 + 4, 7 + 8 and 11 + 23?
+	+----+----+----+
+	| y  | x  | z  |
+	+====+====+====+
+	| 4  | 3  | 7  |
+	| 8  | 7  | 15 |
+	| 23 | 11 | 34 |
+	+----+----+----+
+
+And if the virtual relation had more than one result for a given tuple, e.g. square root would return -2 and +2 for 4, then it could simply return multiple results.
+
+This whole approach could be made syntactically simpler using composition. Using a virtual relation as a function (or indeed a mathematical operator) could be done with COMPOSE(Relation(['X', 'Y'], [(3,4)]), plus).
+
+	>>> print COMPOSE(GENERATE({'x':3, 'y':4}), plus)	#i.e. what's 3 + 4?
+	+---+
+	| z |
+	+===+
+	| 7 |
+	+---+
+
+This is now looking more like a call to a plus function with the COMPOSE making sure that only the new information, the result, is returned. Of course it's really still performing a natural join on two relations. We could go further and extract the result as a number.
+
+	>>> print COMPOSE(GENERATE({'x':3, 'y':4}), plus).toTuple().z		#i.e. what's 3 + 4?
+	7
+
+In the future, a Python operator may be overridden to implement COMPOSE. For example if we override % to be relational composition then we could use something like:  GENERATE({'x':3, 'y':4}) % plus.
+
+Transitive Closure (TCLOSE)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This operator is used to traverse tree-like structures, such as a bill-of-materials. It takes as input a binary relation comprising parent and child pairs and returns a relation that has all hierarchies fully expanded. For example:
+
+        >>> MM = Relation(['MAJOR_P#',       'MINOR_P#'],
+        ...              [{'MAJOR_P#':'P1',  'MINOR_P#':'P2'},
+        ...               {'MAJOR_P#':'P1',  'MINOR_P#':'P3'},
+        ...               {'MAJOR_P#':'P2',  'MINOR_P#':'P3'},
+        ...               {'MAJOR_P#':'P2',  'MINOR_P#':'P4'},
+        ...               {'MAJOR_P#':'P3',  'MINOR_P#':'P5'},
+        ...               {'MAJOR_P#':'P4',  'MINOR_P#':'P6'},
+        ...              ])
+	>>> print TCLOSE(MM)
+	+----------+----------+
+	| MAJOR_P# | MINOR_P# |
+	+==========+==========+
+	| P1       | P2       |
+	| P1       | P3       |
+	| P2       | P3       |
+	| P2       | P4       |
+	| P3       | P5       |
+	| P4       | P6       |
+	| P1       | P4       |
+	| P1       | P5       |
+	| P2       | P5       |
+	| P2       | P6       |
+	| P1       | P6       |
+	+----------+----------+
+
+Quota (QUOTA)
+~~~~~~~~~~~~~
+	>>> print QUOTA(EXAM_MARK, 3, ['Mark'])
+	+----------+-----------+------+
+	| CourseId | StudentId | Mark |
+	+==========+===========+======+
+	| C2       | S1        | 49   |
+	| C1       | S2        | 49   |
+	| C3       | S3        | 66   |
+	+----------+-----------+------+
+
+This operator takes an optional parameter (asc) which, if set False, sorts the tuples in descending rank before the quota is taken, e.g.:
+	>>> print QUOTA(EXAM_MARK, 3, ['Mark'], False)
+	+----------+-----------+------+
+	| CourseId | StudentId | Mark |
+	+==========+===========+======+
+	| C1       | S1        | 85   |
+	| C3       | S3        | 66   |
+	| C1       | S4        | 93   |
+	+----------+-----------+------+
+
+Insert (insert, \|=)
+~~~~~~~~~~~~~~~~~~~~
+todo
+
+Delete (delete, -=)
+~~~~~~~~~~~~~~~~~~~
+todo
+
+Update (update)
+~~~~~~~~~~~~~~~
+todo
+
+
+Databases
+---------
+We currently define a base Database class (in DeeDatabase.py) which provides a namespace for grouping relation variables (base and virtual) together. It also acts as a unit of persistence for both defining, storing and loading relation variables and for transactions. Each new Database should descend from this base class. The initial base relation variable definitions and data should be added and any virtual relation variable definitions and supporting functions.
+
+Each database has its own catalog: a set of relations that describe the database (including itself):
+        relations
+        attributes
+        constraints
+        constraint_attributes
+
+When a database is imported, the relation variables it holds are loaded from disk. When the program that imported the database is finished, the database (i.e. all its relation variables) are stored to disk. The database is also stored upon a transaction commit - see below.
+
+Clusters
+--------
+We currently define a base Cluster class (in DeeCluster.py) which provides a namespace for grouping databases together. Each new Cluster should descend from this base class and import and set its database definitions.
+
+Transactions
+------------
+These are currently controlled at the database level. The database has begin, commit and rollback methods to facilitate transactions.
+
+Relational Operators Included
+-----------------------------
+WRAP
+UNWRAP
+DIVIDE_SIMPLE
+DIVIDE
+
+Aggregate Operators
+-------------------
+COUNT (also len)
+SUM
+AVG
+MAX
+MIN
+
+ALL
+ANY
+
+IS_EMPTY
+
+Front-ends
+----------
+As well as using the Python shell to interact with relations and databases, a stand-alone web-server that gives access to a cluster of sample databases from a browser is available. To start the server and a client run:
+
+	python DeeWebDemo.py
+
+The default browser should launch and a text box will be presented to allow Dee expressions to be entered. The expression can be evaluated by pressing the 'Go' button. The default database can be changed by selecting from the drop-down list and pressing the 'Change database' button.
+
+Unit Tests
+----------
+There are a number of stand-alone unit tests in testDee.py. These can be run using:
+
+	python testDee.py
+
+Future Work
+-----------
+There are a number of areas that need more work. These include:
+
+Constraint Checking
+~~~~~~~~~~~~~~~~~~~
+This should be optimised for insert/update operations where often just the new tuples need to be checked. Also more work could be done to simplify and improve the declaration of some constraints, e.g. ForeignKey.
+
+We would also like to use a multiple assignment mechanism, similar to Python's, to achieve parallel assignment to avoid any need for deferred constraints.
+
+Constraint Inference
+~~~~~~~~~~~~~~~~~~~~
+We need to implement routines to ensure relation constraints, such as candidate keys, are inferred in derived relations. We do some of this already, e.g. for the rename operator, but much more is required.
+
+Catalog Maintenance
+~~~~~~~~~~~~~~~~~~~
+Adding and removing constraints from existing relations is not yet supported. Also database-level constraints cannot be created yet. Also actions such as deleting a relation variable that is referenced should be handled better.
+
+Storage
+~~~~~~~
+The intention is to keep databases in memory with a protected power supply to provide short-term durability. For longer term durability, the database can be saved to disk. This is currently done by storing the database relation variables in a single Python pickle file. If the debug_dump constant is True in DeeDatabase then a script is also written containing the latest relation definitions and data. This storage mechanism could be made more efficient (by storing incremental changes rather than the whole database) and more resilient (e.g. storing online to Amazon's S3).
+
+Concurrency
+~~~~~~~~~~~
+The current implementation is intended to be shared by a single application, e.g. a web-server, feeding multiple clients. Work is needed to ensure that multiple threads can share the data and serialise transactions.
+
+Attribute Values
+~~~~~~~~~~~~~~~~
+Some work is needed to tighten up the permitted values in Tuples. For example, whether None can be used and how Python objects are stored and compared.
+
+API
+~~~
+We envisage several possible ways of accessing the data, e.g. RPC, SOAP.
+
+Virtual Relations
+~~~~~~~~~~~~~~~~~
+These need to allow inserts, deletes and updates that can then be passed down to the base relation(s) where possible. Also an improved method for storing their definitions is needed.
+
+Security
+~~~~~~~~
+Access rights and privileges need to be designed and implemented.
+
+SQL Veneer
+~~~~~~~~~~
+Obviously SQL will be around for a long time yet, so an interpreter could be built to parse SQL and generate the equivalent statements in Dee (where possible).
+
+Optimisation
+~~~~~~~~~~~~
+By working with in-memory data and using fully hashed relations we can perform very fast joins. We have some optimisation code for some relational operators, but this could be improved e.g. by introducing a ternary join operator.
+
+Et Cetera
+~~~~~~~~~
+* renderXML()
+* Excel/web-spreadsheet as a front-end for data entry
+* Syntax highlighting
+* _scan to yield tuples for pipelining
+* update shorthand for delete/insert
+
+
+Colophon
+--------
+This document was written in `reStructuredText <http://docutils.sourceforge.net/rst.html>`_ format. The HTML was generated using `Docutils <http://docutils.sourceforge.net/>`_. The examples within it were verified by `doctest <http://www.python.org/doc/lib/module-doctest.html>`_.
+
+.. _Python: http://www.python.org/
+.. _`The Third Manifesto`: http://www.amazon.co.uk/Databases-Types-Relational-Model-C-J/dp/0321399420/sr=1-2/qid=1169757255/ref=sr_1_2/203-3128636-8071105?ie=UTF8&s=books
+.. _`Database in Depth`: http://www.amazon.co.uk/Database-Depth-Relational-Model-Practitioners/dp/0596100124/sr=1-2/qid=1169757016/ref=sr_1_2/203-3128636-8071105?ie=UTF8&s=books
+.. _`The Database Relational Model`: http://www.amazon.co.uk/Database-Relational-Model-Retrospective-Historical/dp/0201612941/sr=1-9/qid=1169757016/ref=sr_1_9/203-3128636-8071105?ie=UTF8&s=books
