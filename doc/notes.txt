@@ -1,0 +1,14 @@
+Notes
+=====
+
+Python 2.6+ only!
+
+Attribute name restrictions because of internal use of namedtuple:           
+  ValueError('Type names and field names can only contain alphanumeric characters and underscores: %r' % name)
+  ValueError('Type names and field names cannot be a keyword: %r' % name)
+  ValueError('Type names and field names cannot start with a number: %r' % name)
+  ValueError('Field names cannot start with an underscore: %r' % name)
+
+Extend etc. can omit explicit heading parameter because the lambda dictionary keys will be used - but these must be constants.
+
+New operator: IMAGE (should remove SUMMARIZE and DIVIDE)

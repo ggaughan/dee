@@ -1,0 +1,15 @@
+Dee for Python3
+===============
+
+Python 3 syntax (compatible with 2.6 if possible)
+
+Use new {} set literals
+Use code inspection to remove need for extra [] heading on extend/update
+All Relations to be (implicitly if necessary) part of an outer Database
+Database catalog implemented via Dee
+Constraints held at database level
+Plugin structure for Database persistence
+Extensive unit testing and coverage
+
+Perhaps layers on top: SQL, Django, SQLAlchemy etc? perhaps via DB-API
+Perhaps DB-API is the persistence plugin method too?
