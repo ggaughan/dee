@@ -62,18 +62,16 @@ def smart_open(filename=None, mode='r'):
         if fh is not sys.stdout and fh is not sys.stdin:
             fh.close()
 
-#     outdatas * file * myfilenames   #each outdatas needs filename col! (simple to extend('dummy') for single file: no need: cross join degeneration should do fine!!!)
 def file_gen(filename="testfile.dat", data=None):
     # todo pass 'type' parameter, e.g. csv, binary, lines etc.?
     # todo pass size parameters, e.g. amount to read or write
+    # todo return success/bytes-written?
 
     if data is None:
         with smart_open(filename) as f:
-            #for r in f.readlines():
-            #    yield {'filename':filename, 'data':r}
             yield {'filename':filename, 'data':Relation(['i', 'line'],
-                                                [(i, r,) for i, r in enumerate(f.readlines())]
-                                                )}
+                                                        [(i, r,) for i, r in enumerate(f.readlines())]
+                                                       )}
     else:
         with smart_open(filename, 'w') as f:
             for r in data.to_tuple_list(key=lambda t:t.i):
@@ -81,6 +79,13 @@ def file_gen(filename="testfile.dat", data=None):
             # todo: return success?
             yield {'filename':filename, 'data':data}
 
+def file_gen_out(filename_out="testfile.dat", data=None):
+    # effectively rename
+    return file_gen(filename_out, data)
+
+
+# todo if/else?
+#      switch
 
 
 class TestRelation(unittest.TestCase):
@@ -192,22 +197,6 @@ class TestRelation(unittest.TestCase):
 
         self.assertEqual(global_test, [10, 30])
 
-    def test_file_read(self):
-        file_view = View(file_gen)
-
-        print file_view & GENERATE({'filename':'tests/testfile.dat'})
-
-        #todo test with multiple files
-
-    # todo need a way to test with stdin + ctrl+d
-    # def test_file_read2(self):
-    #     file_view = View(file_gen)
-
-    #     print file_view & GENERATE({#'filename':'tests/testfile.dat'
-    #                               })
-
-    #     #todo test with multiple files
-
     def test_file_write(self):
         file_view = View(file_gen)
 
@@ -218,19 +207,85 @@ class TestRelation(unittest.TestCase):
                                                     ])
                                    })
 
-        #todo test with multiple files
+        # test with multiple files
+        print file_view & Relation(['filename', 'data'], [
+                                   {'filename':'tests/testfile.dat',
+                                    'data':Relation(['i','line'],
+                                                    [{'i':0, 'line':'This is a new file'},
+                                                     {'i':1, 'line':' with multiple lines'},
+                                                    ])
+                                   },
+                                   {'filename':'tests/testfile2.dat',
+                                    'data':Relation(['i','line'],
+                                                    [{'i':0, 'line':'This is another file'},
+                                                     {'i':1, 'line':' with three'},
+                                                     {'i':2, 'line':' lines'},
+                                                    ])
+                                   },
+                                   ])
+
 
     def test_file_write2(self):
         file_view = View(file_gen)
 
-        print file_view & GENERATE({#'filename':'tests/testfile.dat',
+        print file_view & GENERATE({# stdout  'filename':'tests/testfile.dat',
                                     'data':Relation(['i','line'],
                                                     [{'i':0, 'line':'This is a new file'},
                                                      {'i':1, 'line':' with multiple lines'},
                                                     ])
                                    })
 
-        #todo test with multiple files
+        # test with multiple files
+        print file_view & Relation([# stdout 'filename',
+                                    'data'], [
+                                   {# stdout 'filename':'tests/testfile.dat',
+                                    'data':Relation(['i','line'],
+                                                    [{'i':0, 'line':'This is a new file'},
+                                                     {'i':1, 'line':' with multiple lines'},
+                                                    ])
+                                   },
+                                   {# stdout 'filename':'tests/testfile2.dat',
+                                    'data':Relation(['i','line'],
+                                                    [{'i':0, 'line':'This is another file'},
+                                                     {'i':1, 'line':' with three'},
+                                                     {'i':2, 'line':' lines'},
+                                                    ])
+                                   },
+                                   ])
+
+    def test_file_read(self):
+        file_view = View(file_gen)
+
+        print file_view & GENERATE({'filename':'tests/testfile.dat'})
+
+        # test with multiple files
+        print file_view & Relation(['filename'],
+                                    [('tests/testfile.dat',),
+                                     ('tests/testfile2.dat',),
+                                   ])
+
+    # todo need a way to test with stdin + ctrl+d
+    # def test_file_read2(self):
+    #     file_view = View(file_gen)
+
+    #     print file_view & GENERATE({#'filename':'tests/testfile.dat'
+    #                               })
+
+    #     #todo test with multiple files
+
+    def test_file_read_write(self):
+        file_view = View(file_gen)
+
+        # read file and effectively pipe into output file
+        print (file_view & GENERATE({'filename':'tests/testfile.dat'})
+              ).remove({'filename'}).extend(lambda t:{'filename':'tests/testfile_piped.dat'}) & file_view
+
+        # todo fix multiple files
+        file_view_out = View(file_gen_out)
+        print file_view & Relation(['filename', 'filename_out'],
+                                    [('tests/testfile.dat', 'tests/testfile_pipe.dat'),
+                                     ('tests/testfile2.dat', 'tests/testfile_pipe.dat'),
+                                   ]) #& file_view_out
 
 
 if __name__ == '__main__':
