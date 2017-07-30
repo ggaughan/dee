@@ -70,7 +70,7 @@ def file_gen(filename="testfile.dat", data=None):
     if data is None:
         with smart_open(filename) as f:
             yield {'filename':filename, 'data':Relation(['i', 'line'],
-                                                        [(i, r,) for i, r in enumerate(f.readlines())]
+                                                        [(i, r.rstrip('\n'),) for i, r in enumerate(f.readlines())]
                                                        )}
     else:
         with smart_open(filename, 'w') as f:
