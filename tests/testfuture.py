@@ -122,6 +122,21 @@ class TestRelation(unittest.TestCase):
                                  })
         )
 
+        def test(t):
+            """Test function def referenced by extend in loop"""
+            x = t.i * 100
+            return "result is {}".format(x)
+
+        self.assertEqual((loop & GENERATE({'start':1, 'end':5})).extend(lambda t:{'extra':test(t)}),
+                        Relation(['start', 'end', 'i', 'extra'],
+                                 {(1, 5, 1, "result is 100"),
+                                  (1, 5, 2, "result is 200"),
+                                  (1, 5, 3, "result is 300"),
+                                  (1, 5, 4, "result is 400"),
+                                  (1, 5, 5, "result is 500"),
+                                 })
+        )
+
     def test_debug(self):
         global global_test
         global_test = []
