@@ -43,6 +43,44 @@ debug = View(print_gen)
 
 
 #todo: IO with files
+import sys
+import contextlib
+
+@contextlib.contextmanager
+def smart_open(filename=None, mode='r'):
+    if filename and filename != '-':
+        fh = open(filename, mode)
+    else:
+        if mode == 'r':
+            fh = sys.stdin
+        else:
+            # todo assert mode=='w'
+            fh = sys.stdout
+    try:
+        yield fh
+    finally:
+        if fh is not sys.stdout and fh is not sys.stdin:
+            fh.close()
+
+#     outdatas * file * myfilenames   #each outdatas needs filename col! (simple to extend('dummy') for single file: no need: cross join degeneration should do fine!!!)
+def file_gen(filename="testfile.dat", data=None):
+    # todo pass 'type' parameter, e.g. csv, binary, lines etc.?
+    # todo pass size parameters, e.g. amount to read or write
+
+    if data is None:
+        with smart_open(filename) as f:
+            #for r in f.readlines():
+            #    yield {'filename':filename, 'data':r}
+            yield {'filename':filename, 'data':Relation(['i', 'line'],
+                                                [(i, r,) for i, r in enumerate(f.readlines())]
+                                                )}
+    else:
+        with smart_open(filename, 'w') as f:
+            for r in data.to_tuple_list(key=lambda t:t.i):
+                f.write(r.line + '\n')
+            # todo: return success?
+            yield {'filename':filename, 'data':data}
+
 
 
 class TestRelation(unittest.TestCase):
@@ -153,6 +191,46 @@ class TestRelation(unittest.TestCase):
         debug & self.r1.rename({'a':'value'}).project(['value'])
 
         self.assertEqual(global_test, [10, 30])
+
+    def test_file_read(self):
+        file_view = View(file_gen)
+
+        print file_view & GENERATE({'filename':'tests/testfile.dat'})
+
+        #todo test with multiple files
+
+    # todo need a way to test with stdin + ctrl+d
+    # def test_file_read2(self):
+    #     file_view = View(file_gen)
+
+    #     print file_view & GENERATE({#'filename':'tests/testfile.dat'
+    #                               })
+
+    #     #todo test with multiple files
+
+    def test_file_write(self):
+        file_view = View(file_gen)
+
+        print file_view & GENERATE({'filename':'tests/testfile.dat',
+                                    'data':Relation(['i','line'],
+                                                    [{'i':0, 'line':'This is a new file'},
+                                                     {'i':1, 'line':' with multiple lines'},
+                                                    ])
+                                   })
+
+        #todo test with multiple files
+
+    def test_file_write2(self):
+        file_view = View(file_gen)
+
+        print file_view & GENERATE({#'filename':'tests/testfile.dat',
+                                    'data':Relation(['i','line'],
+                                                    [{'i':0, 'line':'This is a new file'},
+                                                     {'i':1, 'line':' with multiple lines'},
+                                                    ])
+                                   })
+
+        #todo test with multiple files
 
 
 if __name__ == '__main__':
