@@ -22,21 +22,21 @@ class InvalidTuple(Exception):
 class InvalidOperation(Exception):
     def __init__(self, *args):
         pass
-    
+
 class Relation(object):
-    
+
     def __init__(self, heading, body=None):
         """Construct a relation
-        
+
            heading lists the fields names.
-        
-           The field_names are a single string with each fieldname separated by whitespace and/or commas, 
+
+           The field_names are a single string with each fieldname separated by whitespace and/or commas,
            for example 'x y' or 'x, y'. Alternatively, field_names can be a sequence of strings such as ['x', 'y'].
 
            Any valid Python identifier may be used for a fieldname except for names starting with an underscore.
-           Valid identifiers consist of letters, digits, and underscores but do not start with a digit or underscore 
+           Valid identifiers consist of letters, digits, and underscores but do not start with a digit or underscore
            and cannot be a keyword such as class, for, return, global, pass, or raise.
-           
+
            body is either:
                a list of tuples - duplicates will be removed
                a lambda expression which will return a list of tuples (i.e. deferred pipeline - note: immediate resolutions)
@@ -80,7 +80,7 @@ class Relation(object):
     def from_tuple(tr):
         """Converts a Tuple into a relation"""
         return Relation([k for k in tr], [tuple([v for v in tr.values()])])
-        
+
     def _add_to_body(self, body):
         if hasattr(body, '__call__'):
             raise Exception("Cannot modify a View body")  #todo use more refined type
@@ -93,7 +93,7 @@ class Relation(object):
                     self._myhash = None
             else:
                 raise InvalidTuple()
-            
+
     def _remove_from_body(self, body):
         if hasattr(body, '__call__'):
             raise Exception("Cannot modify a View body")  #todo use more refined type
@@ -108,8 +108,8 @@ class Relation(object):
                     pass
             else:
                 raise InvalidTuple()
-            
-            
+
+
     def _is_deferred(self):
         """Returns True if the body of this relation is deferred"""
         return self._pipelined
@@ -118,7 +118,7 @@ class Relation(object):
     def _scan(self, rel=None):
         #todo: if the body is pipelined, buffer a number of rows
         #      so we can save re-starting the pipeline below a certain limit
-        
+
         #todo: move the View code out to View._scan
         if rel is None:
             if isinstance(self, View):
@@ -200,7 +200,7 @@ class Relation(object):
                             for tup in self._body:
                                 if all([getattr(tup, attr) == getattr(rel, attr) for attr in com]):
                                     yield tup
-                            
+
     #Note: original intention was _scan would return tuples and _pipeline would yield header then tuples
     #but pipelining seems to always have heading pre-calculated when Relation is declared
     _pipeline = _scan  #todo: for now
@@ -216,11 +216,11 @@ class Relation(object):
                 for tup in self._body:
                     myhash ^= hash(tup) #todo track call-count
                 #print "iterated hash called on", self.heading
-    
+
             self._myhash = myhash
-            
+
         return self._myhash
-    
+
     def __contains__(self, rel):
         """Membership, e.g. t in r1, r1 in r2"""
         #todo if isinstance(rel, Relation): return rel <= self   #i.e. subset
@@ -236,7 +236,7 @@ class Relation(object):
                     return True
         #else error: plain tuple not clear enough?
         return False  #todo: perhaps return None if unknown rel, and False if known but not found
-            
+
     def __eq__(self, r):
         if set(self.heading) == set(r.heading):
             if len(self) == len(r):
@@ -249,20 +249,20 @@ class Relation(object):
 
     def __ne__(self, r):
         return not self.__eq__(r)
-    
+
     def __len__(self):
         return COUNT(self)
-    
+
     def __and__(self, r):
         return AND(self, r)
-    
+
     def __or__(self, r):
         return OR(self, r)
-    
+
     def __ior__(self, rel):
         """In-place OR, i.e. insertion"""
         #todo assert rel is relation or tuple else: raise RelationInvalidOperationException(self, "insert expects a Relation or a Tuple")
-        
+
         if self.is_deferred:
             self._materialise()
 
@@ -277,7 +277,7 @@ class Relation(object):
         body=[]
         for tr2 in rel._scan():
             body.append(tuple([getattr(tr2, attr) for attr in self.heading]))  #Note deep copies varying dict
-       
+
         self._add_to_body(body)
 
         if self._database:
@@ -296,19 +296,19 @@ class Relation(object):
                 #todo? perhaps turn off constraint checking to be sure we can revert
                 self._database.__setattr__(self._database_item, self)
                 raise
-        
+
         return self
 
     def __sub__(self, rel):
         return MINUS(self, rel)
-    
+
     def __isub__(self, rel):
         """In-place MINUS, i.e. deletion"""
         #todo assert rel is relation or tuple else: raise RelationInvalidOperationException(self, "delete expects a Relation or a Tuple")
 
         if self.is_deferred:
             self._materialise()
-        
+
         if self._as_tuple(rel):
             return self.__isub__(Relation.from_tuple(rel))
 
@@ -321,7 +321,7 @@ class Relation(object):
             body.append(tuple([getattr(tr2, attr) for attr in self.heading]))  #Note deep copies varying dict
 
         #todo save before so we can db.check_constraints
-            
+
         self._remove_from_body(body)
 
         if self._database:
@@ -340,9 +340,9 @@ class Relation(object):
                 #todo? perhaps turn off constraint checking to be sure we can revert
                 self._database.__setattr__(self._database_item, self)
                 raise
-            
+
         return self
-    
+
     def insert(self, rel):
         """Insert new relation/tuple (in place) into relation"""
         self.__ior__(rel)
@@ -355,15 +355,15 @@ class Relation(object):
         """Update tuples (in place) in relation, e.g. r.update(lambda t: t.x==3, ['UpdAttr'], lambda u: {'UpdAttr':4})"""
         if not hasattr(setting, '__call__'):
             raise InvalidOperation("setting should be a function, e.g. lambda t: {'new':t.id * 3} (%s)" % setting)
-        
+
         hsetting = extract_keys(setting)    #find the heading from the setting
-               
+
         old = self.where(restriction)
         t1 = old.rename(dict(zip(self.heading, ['OLD_'+x for x in self.heading])))
         upd = t1.extend(setting)
         hupdold = set(['OLD_'+x for x in hsetting])
         hupdback = upd.heading - hupdold
-        new = upd.remove(hupdold).rename(dict(zip([x for x in hupdback if x.startswith('OLD_')], 
+        new = upd.remove(hupdold).rename(dict(zip([x for x in hupdback if x.startswith('OLD_')],
                                                   [x.lstrip('OLD_') for x in hupdback if x.startswith('OLD_')]))
                                         )
         #todo: make these two atomic!
@@ -380,7 +380,7 @@ class Relation(object):
             if attr not in self.heading:
                 raise InvalidOperation(self, "Unknown attribute: %s" % attr)
         heading = tuple([newnames.get(c, c) for c in self.heading])
-        
+
         #Validate the new heading
         try:
             class Tuple(namedtuple('Tuple', heading)):
@@ -416,7 +416,7 @@ class Relation(object):
                     #body.append(Tuple(*tr1))  #todo is this faster/better?
                     body.append(tuple([getattr(tr1, attr) for attr in self.heading]))
                 return Relation(heading, body)
-    
+
     def project(self, head):
         """Relational PROJECT (shorthand/macro for REMOVE)"""
         #todo handle single string -> [string]?
@@ -425,17 +425,17 @@ class Relation(object):
                 raise InvalidOperation(self, "Unknown attribute: %s" % attr)
         remove_head = self.heading - set(head)
         return REMOVE(self, remove_head)
-    
+
     def where(self, restriction=lambda r:True):
         """Restrict rows by condition, e.g. r.where(lambda t: t.x==3)"""
         return RESTRICT(self, restriction)
-    
+
     def extend(self, extension=lambda t:{}):
         """Extend rows based on extension
-        
+
            t must return a dictionary of attribute names and expressions,
            e.g. lambda t:{'total':t.quantity * t.price}
-        
+
            (creates pseudo relation for the extension and then joins)"""
         return EXTEND(self, extension)
 
@@ -454,7 +454,7 @@ class Relation(object):
     def unwrap(self, wrapname):
         """Unwrap rows by into Hr attributes from an attribute, wrapname"""
         return UNWRAP(self, wrapname)
-    
+
     def remove(self, head):
         """Remove one or more columns (-> REMOVE), e.g. r.remove(['a','b'])"""
         #todo validateHeading(head)
@@ -464,7 +464,7 @@ class Relation(object):
         """Calls through to project (shorthand), e.g. r(['id', 'name'])"""
         #todo test with set literal syntax, e.g. {'a', 'b'}
         return self.project(head)
-    
+
     def __repr__(self):
         """Return relation as Python definition syntax, e.g. Relation(['x','y'], [{'x':1,'y':2}, {'x':3,'y':4}])"""
         sbody = None
@@ -474,10 +474,10 @@ class Relation(object):
         return "Relation([%(heading)s],\n%(body)s)" % {'heading':",".join(["'%s'" % attr for attr in self.heading]),
                                                      'body':sbody
                                                      }
-    
+
     #todo remove def __repr__(self):
     #    return "%s %s" % (self.heading, self._body)  #todo return Python
-    
+
     #todo __unicode__
     def __str__(self):
         columns = range(len(self.heading))
@@ -546,7 +546,7 @@ class Relation(object):
         result.append(hline)
 
         return "".join(result)[:-1] #debug + ("(%s)" % getPerfs())
-    
+
     #todo temporary: rename/remove
     def renderHTML(self, columns=None, sort=None, row_limit=None, link_columns=None, title_columns=False):
         """Render relation to HTML for client transport/display/parsing
@@ -612,8 +612,8 @@ class Relation(object):
             result.append(line(columns, tup))
             i += 1
 
-        return '<table>' + "".join(result) + "</tbody></table>"   
-    
+        return '<table>' + "".join(result) + "</tbody></table>"
+
     def to_tuple_list(self, key=lambda t:t, reverse=False):
         """Converts a relation to a Tuple list
         """
@@ -637,16 +637,16 @@ def test(a):
     for x in xrange(3):
         yield (x+1, x+2, x+3)
 test.heading = ['a','b','c']
-        
+
 class View(Relation):
-    
+
     def __init__(self, body):
         """Construct a virtual relation
-        
+
            body is either:
                a lambda expression which will return a Relation expression
                a generator which will yield a set of tuples
-           
+
            The heading will be derived from the body expression if it's a relation expression
            or from the generator parameters otherwise.
         """
@@ -676,11 +676,11 @@ class View(Relation):
             raise Exception("body needs to be a deferred Relation expression, e.g. lambda:R1 & R2")  #todo use more refined type
 
     #todo heading property if we need to refresh it on every call
-    
+
     def __ior__(self, rel):
         """In-place OR, i.e. insertion"""
         raise InvalidOperation("Cannot assign to a view")
-        
+
     def __isub__(self, rel):
         """In-place MINUS, i.e. deletion"""
         raise InvalidOperation("Cannot assign to a view")
@@ -689,7 +689,7 @@ class View(Relation):
         """Materialises a relation body from a deferred pipeline
         """
         raise InvalidOperation("Cannot materialise a view")
-    
+
 ##Wrappers: these wrap a lambda expression and make it behave like a relation so the A algebra can be used,
 ## e.g. RESTRICT and EXTEND can be implemented in terms of AND
 def relationFromCondition(f):
@@ -700,7 +700,7 @@ def relationFromCondition(f):
             return []      #DUM, i.e. False
 
     return wrapper
-    
+
 def relationFromExtension(f):
     def wrapper(trx):
         return [f(trx)]
@@ -710,7 +710,7 @@ def relationFromExtension(f):
 ##Relational operators
 ##Implements the parts of A needed by the Relation class
 
-### Essential ###    
+### Essential ###
 def AND(r1, r2):
     """Natural join
        Ranges from intersection (both relations have same heading)
@@ -722,7 +722,7 @@ def AND(r1, r2):
     if hasattr(r1._body, '__call__') and not r1.is_deferred:
         if not hasattr(r2._body, '__call__') or r2.is_deferred:
             return AND(r2, r1)
-    
+
     #todo optimise the order
     hs = r1.heading | r2.heading
 
@@ -733,20 +733,27 @@ def AND(r1, r2):
 
 def _and(r1, r2):
     hs = r1.heading | r2.heading
-    
+
     seen = set()  #todo: optimise if possible (e.g. if PK in both)
     hs1 = hs & r1.heading
     hs2 = hs - r1.heading
     hcommon = r1.heading & r2.heading
+    r2_Ttuple = namedtuple('Ttuple', r2.heading)
+    r2_Ttuple.heading = OrderedSet(r2.heading)
     for tr1 in r1._pipeline():
-        for tr2 in r2._pipeline(tr1):
+        if hasattr(r2._body, '__call__') and not r2.is_deferred:
+            # pass only those parameters expected by the view def
+            tr1_matching = r2_Ttuple(**dict(zip(r2.heading, [getattr(tr1, attr) if hasattr(tr1, attr) else None for attr in r2.heading])))
+        else:
+            tr1_matching = tr1
+        for tr2 in r2._pipeline(tr1_matching):
             #if all([getattr(tr1, attr) == getattr(tr2, attr) for attr in hcommon]): #todo remove when scan works (& hcommon)
             t = tuple([getattr(tr1, attr) for attr in hs1] + [getattr(tr2, attr) for attr in hs2])
             if t in seen:
                 continue
             seen.add(t)
             yield t
-                
+
 def OR(r1, r2):
     """Or/Union
        Equates to union (both relations have same heading)
@@ -756,7 +763,7 @@ def OR(r1, r2):
 
     #todo optimise the order
     hs = r1.heading | r2.heading  #== r1.heading
-    
+
     res = Relation(hs, lambda:_or(r1, r2))  #defer
     if True:  #todo: if not deferrable
         res._materialise()
@@ -764,7 +771,7 @@ def OR(r1, r2):
 
 def _or(r1, r2):
     hs = r1.heading | r2.heading  #== r1.heading
-    
+
     seen = set()  #todo: optimise? e.g. track smallest i.e. ensure r1 is smallest
     for tr1 in r1._pipeline():
         t = tuple([getattr(tr1, attr) for attr in hs])
@@ -809,7 +816,7 @@ def REMOVE(r, hr):
         hs = r.heading - set(hr)
     except:
         raise InvalidOperation("Heading attribute(s) should be iterable (%s)" % str(hr))
-    
+
     res = Relation(hs, lambda:_remove(r, hr))  #defer
     if True:  #todo: if not deferrable
         res._materialise()
@@ -847,31 +854,31 @@ def RESTRICT(r, restriction = lambda trx:True):
 def EXTEND(r, extension = lambda trx:{}):
     """Extend rows based on extension
        (creates pseudo relation for the extension and then joins i.e. implemented in terms of AND)
-       (macro)"""   
+       (macro)"""
     if not hasattr(extension, '__call__'):
         raise InvalidOperation("Extension should be a function, e.g. lambda t: {'new':t.id * 3} (%s)" % extension)
-    
+
     hextension = extract_keys(extension)    #find the heading from the extension
     extheading = OrderedSet(hextension)
     if r.heading & extheading != set():
         raise InvalidOperation("EXTEND heading attributes conflict with relation being extended: %s" % (r.heading & extheading))
-    
+
     return AND(r, Relation(r.heading | extheading, relationFromExtension(extension)))
 
 def _EXTEND_EXPLICIT(r, Hextension=None, extension = lambda trx:{}):
     """Extend rows based on extension with explicit heading
        (creates pseudo relation for the extension and then joins i.e. implemented in terms of AND)
-       (macro)"""   
+       (macro)"""
     if Hextension is None:
-        Hextension = []   
+        Hextension = []
     if not hasattr(extension, '__call__'):
         raise InvalidOperation("Extension should be a function, e.g. lambda t: {'new':t.id * 3} (%s)" % extension)
-    
+
     hextension = set(Hextension)
     extheading = OrderedSet(hextension)
     if r.heading & extheading != set():
         raise InvalidOperation("_EXTEND_EXPLICIT heading attributes conflict with relation being extended: %s" % (r.heading & extheading))
-    
+
     return AND(r, Relation(r.heading | extheading, relationFromExtension(extension)))
 
 def MATCHING(r1, r2):
@@ -888,7 +895,7 @@ def NOT_MATCHING(r1, r2):
 def IMAGE(r):
     """Image relation based on outer range tuple
        (macro, but with a Python trick to avoid us having to pass the range variable)
-       
+
        e.g. S.where(lambda t: IMAGE(SP)(['PNO']) == P(['PNO']))
        (Tutorial D equivalent: S WHERE (!!SP){PNO} = P{PNO})
     """
@@ -899,7 +906,7 @@ def IMAGE(r):
     if not hasattr(range_var, '_asdict'):
         raise InvalidOperation("IMAGE needs a range variable (e.g. use within RESTRICT or EXTEND): %s" % (r.heading))
     tx = Relation.from_tuple(range_var._asdict())
-    
+
     return REMOVE(MATCHING(r, tx), r.heading & tx.heading)
 
 def GROUP(r, Hr, groupname):
@@ -914,11 +921,11 @@ def GROUP(r, Hr, groupname):
     #for t in r._scan():
     #    x = Relation.from_tuple(dict(zip(Hs, tuple([getattr(t, attr) for attr in Hs]))))
     #    #todo break?
-    y = _EXTEND_EXPLICIT(r, [groupname], 
+    y = _EXTEND_EXPLICIT(r, [groupname],
                          lambda t:{groupname:COMPOSE(r, Relation.from_tuple(
                                            dict(zip(Hs, tuple([getattr(t, attr) for attr in Hs])))
                                    ))})
-    
+
     return y.project(Hs | set([groupname]))
 
 def UNGROUP(r, groupname):
@@ -937,7 +944,7 @@ def UNGROUP(r, groupname):
                  [Ttuple._make([getattr(s, groupname)] + [getattr(t, f) for f in t._fields])
                   for s in r([groupname])._pipeline() for t in getattr(s, groupname)._pipeline()]
                 )
-    
+
     return COMPOSE(r, T)
 
 def WRAP(r, Hr, wrapname):
@@ -992,8 +999,8 @@ def TCLOSE(r):
         return TTT
     else:
         return TCLOSE(TTT)
-    
-    
+
+
 ##Aggregate operators
 def COUNT(r):
     """Count tuples"""
