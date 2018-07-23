@@ -58,7 +58,7 @@ class Relation(object):
         self.heading = OrderedSet(self.Tuple._fields)
         if hasattr(body, '__call__'):
             self._body = body
-            self._pipelined = (body.func_name == '<lambda>')  #i.e. not parameter-needing, e.g. relationFromCondition wrapper
+            self._pipelined = (body.__name__ == '<lambda>')  #i.e. not parameter-needing, e.g. relationFromCondition wrapper
         else:
             self._body = []
             if body:
@@ -211,7 +211,7 @@ class Relation(object):
             myhash=0
             if self.is_deferred:
                 #todo ok to equate views etc.?
-                myhash = hash(self._body.func_code.co_code)  #todo ok
+                myhash = hash(self._body.__code__.co_code)  #todo ok
             else:
                 for tup in self._body:
                     myhash ^= hash(tup) #todo track call-count
@@ -291,7 +291,7 @@ class Relation(object):
                 self._database._constraint_checking = cc
             try:
                 self._database.__setattr__(self._database_item, self)
-            except Exception, e:  #todo trap Constraint exceptions specifically
+            except Exception as e:  #todo trap Constraint exceptions specifically
                 self._remove_from_body(body)
                 #todo? perhaps turn off constraint checking to be sure we can revert
                 self._database.__setattr__(self._database_item, self)
@@ -335,7 +335,7 @@ class Relation(object):
                 self._database._constraint_checking = cc
             try:
                 self._database.__setattr__(self._database_item, self)
-            except Exception, e:  #todo trap Constraint exceptions specifically
+            except Exception as e:  #todo trap Constraint exceptions specifically
                 self._add_to_body(body)
                 #todo? perhaps turn off constraint checking to be sure we can revert
                 self._database.__setattr__(self._database_item, self)
@@ -650,11 +650,11 @@ class View(Relation):
            The heading will be derived from the body expression if it's a relation expression
            or from the generator parameters otherwise.
         """
-        if body.func_name == '<lambda>':
+        if body.__name__ == '<lambda>':
             heading = body().heading  #note: may cause body expression to be calculated #todo so cache it now?
         else:
             #we are wrapping a generator as a relation, so use its parameter list
-            heading = body.func_code.co_varnames[:body.func_code.co_argcount]
+            heading = body.__code__.co_varnames[:body.__code__.co_argcount]
         self._myhash = None
         self._pipelined  = False
         self._database = None
@@ -671,7 +671,7 @@ class View(Relation):
         self.heading = OrderedSet(self.Tuple._fields)
         if hasattr(body, '__call__'):
             self._body = body
-            self._pipelined = (body.func_name == '<lambda>')  #i.e. not parameter-needing, e.g. generator
+            self._pipelined = (body.__name__ == '<lambda>')  #i.e. not parameter-needing, e.g. generator
         else:
             raise Exception("body needs to be a deferred Relation expression, e.g. lambda:R1 & R2")  #todo use more refined type
 

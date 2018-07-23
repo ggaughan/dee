@@ -36,7 +36,7 @@ loop = View(loop_gen)
 
 global_test = []
 def print_gen(value):
-    print "DEBUG:", value  # side-effect
+    print("DEBUG:", value)  # side-effect
     global_test.append(value)  # side-effect
     yield {'value':value}
 debug = View(print_gen)
@@ -200,15 +200,15 @@ class TestRelation(unittest.TestCase):
     def test_file_write(self):
         file_view = View(file_gen)
 
-        print file_view & GENERATE({'filename':'tests/testfile.dat',
+        print(file_view & GENERATE({'filename':'tests/testfile.dat',
                                     'data':Relation(['i','line'],
                                                     [{'i':0, 'line':'This is a new file'},
                                                      {'i':1, 'line':' with multiple lines'},
                                                     ])
-                                   })
+                                   }))
 
         # test with multiple files
-        print file_view & Relation(['filename', 'data'], [
+        print(file_view & Relation(['filename', 'data'], [
                                    {'filename':'tests/testfile.dat',
                                     'data':Relation(['i','line'],
                                                     [{'i':0, 'line':'This is a new file'},
@@ -222,21 +222,21 @@ class TestRelation(unittest.TestCase):
                                                      {'i':2, 'line':' lines'},
                                                     ])
                                    },
-                                   ])
+                                   ]))
 
 
     def test_file_write2(self):
         file_view = View(file_gen)
 
-        print file_view & GENERATE({# stdout  'filename':'tests/testfile.dat',
+        print(file_view & GENERATE({# stdout  'filename':'tests/testfile.dat',
                                     'data':Relation(['i','line'],
                                                     [{'i':0, 'line':'This is a new file'},
                                                      {'i':1, 'line':' with multiple lines'},
                                                     ])
-                                   })
+                                   }))
 
         # test with multiple files
-        print file_view & Relation([# stdout 'filename',
+        print(file_view & Relation([# stdout 'filename',
                                     'data'], [
                                    {# stdout 'filename':'tests/testfile.dat',
                                     'data':Relation(['i','line'],
@@ -251,18 +251,18 @@ class TestRelation(unittest.TestCase):
                                                      {'i':2, 'line':' lines'},
                                                     ])
                                    },
-                                   ])
+                                   ]))
 
     def test_file_read(self):
         file_view = View(file_gen)
 
-        print file_view & GENERATE({'filename':'tests/testfile.dat'})
+        print(file_view & GENERATE({'filename':'tests/testfile.dat'}))
 
         # test with multiple files
-        print file_view & Relation(['filename'],
+        print(file_view & Relation(['filename'],
                                     [('tests/testfile.dat',),
                                      ('tests/testfile2.dat',),
-                                   ])
+                                   ]))
 
     # todo need a way to test with stdin + ctrl+d
     # def test_file_read2(self):
@@ -282,10 +282,10 @@ class TestRelation(unittest.TestCase):
 
         # todo fix multiple files
         file_view_out = View(file_gen_out)
-        print file_view & Relation(['filename', 'filename_out'],
+        print(file_view & Relation(['filename', 'filename_out'],
                                     [('tests/testfile.dat', 'tests/testfile_pipe.dat'),
                                      ('tests/testfile2.dat', 'tests/testfile_pipe.dat'),
-                                   ]) #& file_view_out
+                                   ])) #& file_view_out
 
 
 if __name__ == '__main__':

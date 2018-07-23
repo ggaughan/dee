@@ -61,7 +61,7 @@ def extract_keys(co):
         bytecodes = disassemble(co.func_code)
     else:
         bytecodes = disassemble(co.__code__)
-    
+
     if sys.version_info < (2,6):
         keys = []
         nkeys = []
@@ -73,27 +73,28 @@ def extract_keys(co):
             for bc in bytecodes:
                 if opname[bc[0]] == 'BUILD_MAP':
                     nkeys.append(0)
-                    
+
                 if opname[bc[0]] == 'DUP_TOP':
                     n = nkeys.pop()
                     nkeys.append(1)
-                    
+
                 if opname[bc[0]] == 'STORE_SUBSCR':
                     n = nkeys.pop()
                     if len(nkeys) == 0 or (len(nkeys) == 1 and n == 0):
                         keys.append(lastbc[2].strip("'"))  #todo assert LOAD_CONST
                     if n > 0:
                         nkeys.append(0)
-    
+
                 lastbc = bc
-                        
+
             assert nkeys == [0]  #todo remove
             #todo assert ends with RETURN_VALUE
             return keys
         return None
-    
-    #2.6+
-    elif sys.version_info >= (2,6):
+    elif sys.version_info >= (3,0):  #3.0+ # todo how early did this arrive?
+        # todo parse LOAD_CONST + BUILD_MAP to handle latest bytecode
+        raise NotImplementedError()
+    elif sys.version_info >= (2,6):  #2.6+
         keys = []
         nkeys = []
         if bytecodes:
@@ -103,16 +104,16 @@ def extract_keys(co):
             for bc in bytecodes:
                 if opname[bc[0]] == 'BUILD_MAP':
                     nkeys.append(int(bc[1]))
-    
+
                 if opname[bc[0]] == 'STORE_MAP':
                     n = nkeys.pop()-1
                     if len(nkeys) == 0:
                         keys.append(lastbc[2].strip("'"))  #todo assert LOAD_CONST
                     if n > 0:
                         nkeys.append(n)
-                        
+
                 lastbc = bc
-                        
+
             assert nkeys == [] or nkeys == [0] #todo remove
             #todo assert ends with RETURN_VALUE
             return keys
